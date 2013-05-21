@@ -21,6 +21,7 @@
 *										company code, proj #, and year. 
 * [ProTool].[UpdateForecastFromExcel] - Updates a single row in the Forecast table with the provided values using special business logic.
 * [ProTool].[GetCompanyList]		- Gets a list of companies for populating a Dropdown control.
+* [ProTool].[GetUserProjectRoles]	- Gets a list of project roles for the provided company, project, and user id.
 ***************************************************************************/
 USE ProTool
 GO
@@ -510,6 +511,7 @@ GO
 -- DATE			DEVELOPER			  CHANGE HISTORY
 ----------------------------------------------------
 -- 03/18/2013   Mike Card, Centric    Created
+-- 05/06/2013   Mike Card, Centric    Added CostCategories.Estimate_Display filter.
 --
 -- UNIT TESTS
 -- EXEC [ProTool].[GetForecastByCategory] 'TCO', '17024', '2013', 'U909674'
@@ -639,6 +641,7 @@ AS
 			AND f.Estimate_Year = @year AND f.Version_No = @version
 			AND c.Cost_Category_Type = @categoryType
 			AND c.Capital_Active_Fl = 1
+			AND c.Estimate_Display = 1
 	  ORDER BY f.Cost_Category_Cd --c.Capital_Display_Order, c.OM_Display_Order, c.Cost_Category_Key
  END
 GO
@@ -663,6 +666,7 @@ GO
 -- DATE			DEVELOPER			  CHANGE HISTORY
 ----------------------------------------------------
 -- 03/15/2013   Mike Card, Centric    Created
+-- 05/06/2013   Mike Card, Centric    Added CostCategories.Estimate_Display filter.
 --
 -- UNIT TESTS
 -- EXEC [ProTool].[UpdateForecastFromExcel] 'TCO', 17024, '2013', 101, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200, 1, 'U909674'
@@ -767,7 +771,7 @@ AS
 							+ ' AND Cost_Category_Cd = ' + CAST(@costCategoryCode as varchar(50))
 							+ ' AND (SELECT COUNT(*) FROM [ProTool].[CostCategories] WHERE'
 							+ ' Cost_Category_Cd = ' + CAST(@costCategoryCode as varchar(50))
-							+ ' AND Capital_Active_Fl = 1) = 1'
+							+ ' AND Capital_Active_Fl = 1 AND Estimate_Display = 1) = 1'
 			--SELECT @sql as Query 
 			EXECUTE(@sql)
 			IF @@ROWCOUNT > 0
@@ -947,8 +951,46 @@ INSERT INTO [ProTool].[Settings]
            ,1)
 GO
 
-
-
+/*********************
+** Get User's Project Roles
+**********************/
+if exists(select * from dbo.sysobjects where id = OBJECT_ID(N'[ProTool].[GetUserProjectRoles]') and OBJECTPROPERTY(id, N'IsProcedure') = 1)
+DROP PROCEDURE [ProTool].[GetUserProjectRoles]
+Print 'Creating Stored Procedure [ProTool].[GetUserProjectRoles]'
+GO
+/* =================================================
+-- SUMMARY: Gets a list of project roles for the provided 
+--          company, project, and user id.
+-- 
+-- DATE			DEVELOPER			  CHANGE HISTORY
+----------------------------------------------------
+-- 05/18/2013   Mike Card, Centric    Created
+--
+-- UNIT TESTS
+-- EXEC [ProTool].[GetUserProjectRoles] 'TCO', 16764, 'U123019'
+-- ================================================= */
+CREATE PROCEDURE [ProTool].[GetUserProjectRoles]
+	@Company_Cd varchar(3),  
+	@Project_No int,  
+	@User_ID varchar(10) = NULL
+AS
+ BEGIN
+	SET NOCOUNT ON
+	
+	SELECT [Project_Role_Cd]
+	FROM ProTool.ProjectPeople (nolock)
+	WHERE [Company_Cd] = @Company_Cd
+		AND [Project_No] = @Project_No
+		AND [User_ID] = @User_ID
+	ORDER BY [Project_Role_Cd]
+ END
+GO	
+Print 'Granting Execute permissions on Stored Procedure [ProTool].[GetUserProjectRoles]'
+GRANT EXECUTE ON [ProTool].[GetUserProjectRoles] TO [db_FieldCostTracker]
+GO
+IF (EXISTS(SELECT * FROM sys.database_principals WHERE name = N'developers' AND type = 'R'))
+GRANT EXECUTE ON [ProTool].[GetUserProjectRoles] TO [developers]
+GO
 
 
 
